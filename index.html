@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="TaskFlow - A responsive task management application for organizing daily tasks.">
+  <title>TaskFlow - Task Management Application</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <span class="brand-mark">TF</span>
+        <div>
+          <h1>TaskFlow</h1>
+          <p>Personal Workspace</p>
+        </div>
+      </div>
+
+      <nav class="side-nav" aria-label="Dashboard navigation">
+        <a href="#overview" class="active">Overview</a>
+        <a href="#tasks">Tasks</a>
+        <a href="#footer">About</a>
+      </nav>
+
+      <div class="profile-card glass">
+        <div class="avatar" id="profileAvatar">U</div>
+        <div>
+          <strong id="profileName">TaskFlow User</strong>
+          <span id="profileEmail">user@example.com</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar glass">
+        <button class="icon-button menu-toggle" id="menuToggle" aria-label="Open navigation">☰</button>
+        <div>
+          <p class="eyebrow">TaskFlow Dashboard</p>
+          <h2 id="greetingTitle">Stay productive 🚀</h2>
+        </div>
+        <div class="topbar-actions">
+          <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme">
+            <span id="themeIcon">☾</span>
+          </button>
+          <button class="logout-button" id="logoutButton" type="button">Logout</button>
+        </div>
+      </header>
+
+      <section class="hero-section reveal">
+        <div class="hero-copy">
+          <p class="eyebrow">Daily Focus</p>
+          <h2>Organize tasks, track progress, and finish the day with clarity.</h2>
+          <p>All data stays in your browser using localStorage, making this project simple, private, and GitHub Pages friendly.</p>
+        </div>
+        <div class="hero-orbit" aria-hidden="true">
+          <span class="orbit-card">Plan</span>
+          <span class="orbit-card">Focus</span>
+          <span class="orbit-card">Done</span>
+        </div>
+      </section>
+
+      <section class="stats-grid reveal" id="overview" aria-label="Task statistics">
+        <article class="stat-card glass">
+          <span>Total</span>
+          <strong id="totalCount">0</strong>
+        </article>
+        <article class="stat-card glass">
+          <span>Completed</span>
+          <strong id="completedCount">0</strong>
+        </article>
+        <article class="stat-card glass">
+          <span>Pending</span>
+          <strong id="pendingCount">0</strong>
+        </article>
+        <article class="stat-card glass">
+          <span>High Priority</span>
+          <strong id="highCount">0</strong>
+        </article>
+      </section>
+
+      <section class="task-panel glass reveal" id="tasks">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Task Input</p>
+            <h2>Create a new task</h2>
+          </div>
+          <span class="date-chip" id="todayLabel"></span>
+        </div>
+
+        <form class="task-form" id="taskForm">
+          <input id="taskTitle" type="text" placeholder="Enter your task..." maxlength="80" autocomplete="off" required>
+          <select id="taskPriority" aria-label="Task priority">
+            <option value="High">High Priority</option>
+            <option value="Medium" selected>Medium Priority</option>
+            <option value="Low">Low Priority</option>
+          </select>
+          <input id="taskDueDate" type="date" aria-label="Task due date">
+          <button class="primary-button" id="submitTask" type="submit">Add Task</button>
+        </form>
+      </section>
+
+      <section class="tasks-layout reveal">
+        <div class="controls-panel glass">
+          <div class="search-box">
+            <label for="searchInput">Search</label>
+            <input id="searchInput" type="search" placeholder="Search tasks...">
+          </div>
+
+          <div class="filter-group" aria-label="Task filters">
+            <button class="filter-button active" data-filter="all" type="button">All</button>
+            <button class="filter-button" data-filter="completed" type="button">Completed</button>
+            <button class="filter-button" data-filter="pending" type="button">Pending</button>
+          </div>
+        </div>
+
+        <div class="task-list glass" id="taskList" aria-live="polite"></div>
+      </section>
+
+      <footer class="footer" id="footer">
+        <p>TaskFlow - Task Management Application.</p>
+        <p>Built with HTML, CSS, Vanilla JavaScript, and localStorage.</p>
+      </footer>
+    </main>
+  </div>
+
+  <div class="auth-overlay" id="authOverlay">
+    <section class="auth-card glass" aria-labelledby="authTitle">
+      <div class="auth-header">
+        <span class="brand-mark">TF</span>
+        <div>
+          <p class="eyebrow">Welcome to</p>
+          <h2 id="authTitle">TaskFlow</h2>
+        </div>
+      </div>
+
+      <div class="auth-tabs" role="tablist">
+        <button class="auth-tab active" id="loginTab" type="button">Login</button>
+        <button class="auth-tab" id="signupTab" type="button">Signup</button>
+      </div>
+
+      <form id="authForm" class="auth-form">
+        <div class="form-field" id="nameField">
+          <label for="authName">Full Name</label>
+          <input id="authName" type="text" placeholder="Your name" autocomplete="name">
+        </div>
+        <div class="form-field">
+          <label for="authEmail">Email</label>
+          <input id="authEmail" type="email" placeholder="user@example.com" autocomplete="email" required>
+        </div>
+        <div class="form-field">
+          <label for="authPassword">Password</label>
+          <input id="authPassword" type="password" placeholder="Minimum 6 characters" autocomplete="current-password" required>
+        </div>
+        <button class="primary-button full-width" id="authSubmit" type="submit">Login</button>
+      </form>
+
+      <p class="auth-note">Frontend-only validation for a static GitHub Pages project.</p>
+    </section>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="script.js"></script>
+</body>
+</html>
