@@ -9,7 +9,7 @@ This project is fully static and ready for GitHub Pages deployment.
 After deploying with GitHub Pages, add your live link here:
 
 ```text
-https://your-username.github.io/taskflow-task-management/
+https://gssriram9050.github.io/task-manager/
 ```
 
 ## Project Preview
