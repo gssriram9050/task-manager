@@ -94,15 +94,16 @@ app.post(['/api/auth/register', '/api/auth/register/'], async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
     }
     if (!name || name.trim().length < 3) {
-      return res.status(400).json({ error: 'Please provide a valid full name (at least 3 characters).' });
+      return res.status(400).json({ error: 'Please provide your full name (at least 3 characters).' });
     }
 
-    const existingUser = await db.findUserByEmail(email, env);
+    const cleanEmail = email.trim().toLowerCase();
+    const existingUser = await db.findUserByEmail(cleanEmail, env);
     if (existingUser) {
-      return res.status(400).json({ error: 'An account with this email address already exists.' });
+      return res.status(400).json({ error: 'An account with this email address already exists. Please log in.' });
     }
 
-    const newUser = await db.createUser(email.trim(), name.trim(), password, env);
+    const newUser = await db.createUser(cleanEmail, name.trim(), password, env);
     const token = generateToken(newUser);
 
     res.status(201).json({
@@ -118,7 +119,7 @@ app.post(['/api/auth/register', '/api/auth/register/'], async (req, res) => {
   }
 });
 
-// User Login
+// User Login (Strict Registration Check)
 app.post(['/api/auth/login', '/api/auth/login/'], async (req, res) => {
   try {
     const { email, password } = req.body || {};
@@ -128,9 +129,14 @@ app.post(['/api/auth/login', '/api/auth/login/'], async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required.' });
     }
 
-    const user = await db.findUserByEmail(email, env);
-    if (!user || user.password_hash !== password) {
-      return res.status(401).json({ error: 'Invalid email or password.' });
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await db.findUserByEmail(cleanEmail, env);
+    if (!user) {
+      return res.status(401).json({ error: 'User not registered. Please sign up first.' });
+    }
+
+    if (user.password_hash !== password) {
+      return res.status(401).json({ error: 'Incorrect password. Please try again.' });
     }
 
     const token = generateToken(user);
@@ -159,7 +165,7 @@ app.get(['/api/auth/me', '/api/auth/me/'], authMiddleware, (req, res) => {
   });
 });
 
-// Task Operations - Get User Tasks
+// Task Operations - Get User Tasks (Strict Per-User Scoping)
 app.get(['/api/tasks', '/api/tasks/'], authMiddleware, async (req, res) => {
   try {
     const env = req.env || null;
@@ -210,7 +216,7 @@ app.put('/api/tasks/:id', authMiddleware, async (req, res) => {
 
     const existing = await db.getTaskById(id, req.user.id, env);
     if (!existing) {
-      return res.status(404).json({ error: 'Task not found.' });
+      return res.status(404).json({ error: 'Task not found or unauthorized.' });
     }
 
     const updated = await db.updateTask(id, req.user.id, title.trim(), priority || 'Medium', dueDate || null, env);
@@ -229,7 +235,7 @@ app.patch('/api/tasks/:id/toggle', authMiddleware, async (req, res) => {
 
     const existing = await db.getTaskById(id, req.user.id, env);
     if (!existing) {
-      return res.status(404).json({ error: 'Task not found.' });
+      return res.status(404).json({ error: 'Task not found or unauthorized.' });
     }
 
     const targetCompleted = typeof completed !== 'undefined' ? Boolean(completed) : !existing.completed;
@@ -248,7 +254,7 @@ app.delete('/api/tasks/:id', authMiddleware, async (req, res) => {
 
     const existing = await db.getTaskById(id, req.user.id, env);
     if (!existing) {
-      return res.status(404).json({ error: 'Task not found.' });
+      return res.status(404).json({ error: 'Task not found or unauthorized.' });
     }
 
     await db.deleteTask(id, req.user.id, env);

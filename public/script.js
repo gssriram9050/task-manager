@@ -2,7 +2,7 @@ const STORAGE_KEYS = {
   token: "taskflow_token",
   user: "taskflow_user",
   theme: "taskflow_theme",
-  localTasks: "taskflow_local_tasks"
+  usersList: "taskflow_registered_users"
 };
 
 const elements = {
@@ -52,11 +52,15 @@ function getToken() {
   return localStorage.getItem(STORAGE_KEYS.token);
 }
 
+function getCurrentUser() {
+  return JSON.parse(localStorage.getItem(STORAGE_KEYS.user) || "null");
+}
+
 function showToast(message) {
   clearTimeout(toastTimer);
   elements.toast.textContent = message;
   elements.toast.classList.add("show");
-  toastTimer = setTimeout(() => elements.toast.classList.remove("show"), 2800);
+  toastTimer = setTimeout(() => elements.toast.classList.remove("show"), 3200);
 }
 
 async function apiFetch(endpoint, method = "GET", body = null) {
@@ -191,15 +195,42 @@ function resetTaskForm() {
   elements.submitTask.textContent = "Add Task";
 }
 
-function getLocalTasks() {
-  return JSON.parse(localStorage.getItem(STORAGE_KEYS.localTasks) || "[]");
+// Local accounts & per-user tasks helpers
+function getRegisteredLocalUsers() {
+  return JSON.parse(localStorage.getItem(STORAGE_KEYS.usersList) || "[]");
 }
 
-function saveLocalTasks(tList) {
-  localStorage.setItem(STORAGE_KEYS.localTasks, JSON.stringify(tList));
+function saveRegisteredLocalUser(userObj) {
+  const usersList = getRegisteredLocalUsers();
+  const existingIndex = usersList.findIndex(u => u.email.toLowerCase() === userObj.email.toLowerCase());
+  if (existingIndex >= 0) {
+    usersList[existingIndex] = userObj;
+  } else {
+    usersList.push(userObj);
+  }
+  localStorage.setItem(STORAGE_KEYS.usersList, JSON.stringify(usersList));
+}
+
+function getLocalUserTasks(userEmail) {
+  if (!userEmail) return [];
+  const key = `taskflow_user_tasks_${userEmail.toLowerCase().trim()}`;
+  return JSON.parse(localStorage.getItem(key) || "[]");
+}
+
+function saveLocalUserTasks(userEmail, tList) {
+  if (!userEmail) return;
+  const key = `taskflow_user_tasks_${userEmail.toLowerCase().trim()}`;
+  localStorage.setItem(key, JSON.stringify(tList));
 }
 
 async function fetchTasksFromBackend() {
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    tasks = [];
+    renderTasks();
+    return;
+  }
+
   try {
     const data = await apiFetch("/api/tasks");
     tasks = Array.isArray(data) ? data : (data.tasks || []);
@@ -207,7 +238,7 @@ async function fetchTasksFromBackend() {
   } catch (err) {
     console.warn("Backend fetch notice:", err.message);
     isOfflineMode = true;
-    tasks = getLocalTasks();
+    tasks = getLocalUserTasks(currentUser.email);
   }
   renderTasks();
 }
@@ -218,9 +249,16 @@ async function addOrUpdateTask(event) {
   const title = elements.taskTitle.value.trim();
   const priority = elements.taskPriority.value;
   const dueDate = elements.taskDueDate.value;
+  const currentUser = getCurrentUser();
 
   if (!title) {
     showToast("Please enter a task title.");
+    return;
+  }
+
+  if (!currentUser) {
+    showToast("Session expired. Please log in.");
+    logout();
     return;
   }
 
@@ -265,7 +303,7 @@ async function addOrUpdateTask(event) {
         tasks.unshift(newTask);
         showToast("Task added.");
       }
-      saveLocalTasks(tasks);
+      saveLocalUserTasks(currentUser.email, tasks);
     }
     resetTaskForm();
     renderTasks();
@@ -289,12 +327,13 @@ function startEditing(taskId) {
 }
 
 async function deleteTask(taskId) {
+  const currentUser = getCurrentUser();
   try {
     if (!isOfflineMode) {
       await apiFetch(`/api/tasks/${taskId}`, "DELETE");
     }
     tasks = tasks.filter((task) => String(task.id) !== String(taskId));
-    if (isOfflineMode) saveLocalTasks(tasks);
+    if (isOfflineMode && currentUser) saveLocalUserTasks(currentUser.email, tasks);
     renderTasks();
     showToast("Task deleted.");
   } catch (err) {
@@ -303,6 +342,7 @@ async function deleteTask(taskId) {
 }
 
 async function toggleComplete(taskId) {
+  const currentUser = getCurrentUser();
   const task = tasks.find((t) => String(t.id) === String(taskId));
   if (!task) return;
 
@@ -317,7 +357,7 @@ async function toggleComplete(taskId) {
       tasks = tasks.map((t) =>
         String(t.id) === String(taskId) ? { ...t, completed: nextCompleted } : t
       );
-      saveLocalTasks(tasks);
+      if (currentUser) saveLocalUserTasks(currentUser.email, tasks);
     }
     renderTasks();
   } catch (err) {
@@ -377,7 +417,7 @@ function setScrollLock(locked) {
 }
 
 function updateUserInterface() {
-  const savedUser = JSON.parse(localStorage.getItem(STORAGE_KEYS.user) || "null");
+  const savedUser = getCurrentUser();
 
   if (!savedUser) {
     elements.greetingTitle.textContent = "Stay productive 🚀";
@@ -394,6 +434,7 @@ function updateUserInterface() {
   elements.profileEmail.textContent = savedUser.email;
 }
 
+// Strict Authentication Handler
 async function handleAuth(event) {
   if (event) event.preventDefault();
 
@@ -432,15 +473,38 @@ async function handleAuth(event) {
       isOfflineMode = false;
     } catch (apiErr) {
       console.warn("API Auth notice:", apiErr.message);
-      // Fallback session handling
-      userObj = { id: 1, name: name || email.split("@")[0], email };
-      tokenStr = `tf_local_token_${Date.now()}`;
+
+      // Handle Strict Authentication locally if server API is unavailable
+      const registeredUsers = getRegisteredLocalUsers();
+      const existingUser = registeredUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+
+      if (authMode === "login") {
+        if (!existingUser) {
+          throw new Error("User not registered. Please sign up first.");
+        }
+        if (existingUser.password !== password) {
+          throw new Error("Incorrect password. Please try again.");
+        }
+        userObj = { id: existingUser.id, name: existingUser.name, email: existingUser.email };
+        tokenStr = `tf_local_token_${Date.now()}`;
+      } else {
+        // Signup mode
+        if (existingUser) {
+          throw new Error("Account already exists. Please log in.");
+        }
+        const newUser = { id: Date.now(), name, email, password };
+        saveRegisteredLocalUser(newUser);
+        userObj = { id: newUser.id, name: newUser.name, email: newUser.email };
+        tokenStr = `tf_local_token_${Date.now()}`;
+      }
       isOfflineMode = true;
     }
 
+    // Save active session
     localStorage.setItem(STORAGE_KEYS.token, tokenStr);
     localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(userObj));
 
+    // Unlock screen & UI
     setScrollLock(false);
     updateUserInterface();
     showToast(authMode === "signup" ? "Signup complete. Welcome!" : "Login successful.");
@@ -498,10 +562,15 @@ async function initializeApp() {
       updateUserInterface();
       await fetchTasksFromBackend();
     } catch (err) {
-      console.warn("Session check notice:", err.message);
-      setScrollLock(false);
-      updateUserInterface();
-      await fetchTasksFromBackend();
+      console.warn("Session validation notice:", err.message);
+      const user = getCurrentUser();
+      if (user) {
+        setScrollLock(false);
+        updateUserInterface();
+        await fetchTasksFromBackend();
+      } else {
+        logout();
+      }
     }
   } else {
     setScrollLock(true);
