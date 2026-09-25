@@ -10,15 +10,12 @@ const elements = {
   authForm: document.getElementById("authForm"),
   authTitle: document.getElementById("authTitle"),
   authSubmit: document.getElementById("authSubmit"),
-  authError: document.getElementById("authError"),
   loginTab: document.getElementById("loginTab"),
   signupTab: document.getElementById("signupTab"),
   nameField: document.getElementById("nameField"),
   authName: document.getElementById("authName"),
   authEmail: document.getElementById("authEmail"),
   authPassword: document.getElementById("authPassword"),
-  togglePasswordBtn: document.getElementById("togglePasswordBtn"),
-  demoAuthButton: document.getElementById("demoAuthButton"),
   logoutButton: document.getElementById("logoutButton"),
   themeToggle: document.getElementById("themeToggle"),
   themeIcon: document.getElementById("themeIcon"),
@@ -62,17 +59,6 @@ function showToast(message) {
   toastTimer = setTimeout(() => elements.toast.classList.remove("show"), 2800);
 }
 
-function showAuthError(msg) {
-  if (!elements.authError) return;
-  if (msg) {
-    elements.authError.textContent = msg;
-    elements.authError.classList.remove("hidden");
-  } else {
-    elements.authError.textContent = "";
-    elements.authError.classList.add("hidden");
-  }
-}
-
 async function apiFetch(endpoint, method = "GET", body = null) {
   const token = getToken();
   const headers = {
@@ -91,7 +77,7 @@ async function apiFetch(endpoint, method = "GET", body = null) {
   try {
     res = await fetch(endpoint, options);
   } catch (netErr) {
-    throw new Error("Network connection error.");
+    throw new Error("Network connection unavailable.");
   }
 
   const rawText = await res.text();
@@ -101,13 +87,13 @@ async function apiFetch(endpoint, method = "GET", body = null) {
     data = JSON.parse(rawText);
   } catch (jsonErr) {
     if (res.status === 404) {
-      throw new Error(`API endpoint not found (${endpoint}).`);
+      throw new Error("Backend API endpoint not found.");
     }
-    throw new Error(`Server returned non-JSON response (${res.status}).`);
+    throw new Error("Server response format error.");
   }
 
   if (!res.ok) {
-    throw new Error(data.error || data.message || `Request failed with status ${res.status}`);
+    throw new Error(data.error || data.message || `Request failed (${res.status})`);
   }
 
   return data;
@@ -156,7 +142,7 @@ function renderTasks() {
       <div class="empty-state">
         <div>
           <h3>No tasks found</h3>
-          <p>Add a new task above or adjust filters to view your workflow.</p>
+          <p>Add a new task or adjust your filters to see your daily workflow here.</p>
         </div>
       </div>
     `;
@@ -219,28 +205,9 @@ async function fetchTasksFromBackend() {
     tasks = Array.isArray(data) ? data : (data.tasks || []);
     isOfflineMode = false;
   } catch (err) {
-    console.warn("Backend fetch fallback notice:", err.message);
+    console.warn("Backend fetch notice:", err.message);
     isOfflineMode = true;
     tasks = getLocalTasks();
-    if (tasks.length === 0) {
-      tasks = [
-        {
-          id: "task-local-1",
-          title: "Explore TaskFlow Workspace",
-          priority: "High",
-          dueDate: new Date().toISOString().split("T")[0],
-          completed: false
-        },
-        {
-          id: "task-local-2",
-          title: "Create your first task",
-          priority: "Medium",
-          dueDate: new Date().toISOString().split("T")[0],
-          completed: true
-        }
-      ];
-      saveLocalTasks(tasks);
-    }
   }
   renderTasks();
 }
@@ -286,7 +253,7 @@ async function addOrUpdateTask(event) {
             ? { ...t, title, priority, dueDate }
             : t
         );
-        showToast("Task updated (local mode).");
+        showToast("Task updated.");
       } else {
         const newTask = {
           id: `task-${Date.now()}`,
@@ -296,7 +263,7 @@ async function addOrUpdateTask(event) {
           completed: false
         };
         tasks.unshift(newTask);
-        showToast("Task added (local mode).");
+        showToast("Task added.");
       }
       saveLocalTasks(tasks);
     }
@@ -379,14 +346,13 @@ function toggleTheme() {
 
 function setAuthMode(mode) {
   authMode = mode;
-  showAuthError("");
   const isSignup = mode === "signup";
 
   elements.loginTab.classList.toggle("active", !isSignup);
   elements.signupTab.classList.toggle("active", isSignup);
   elements.nameField.style.display = isSignup ? "block" : "none";
   elements.authTitle.textContent = isSignup ? "Create Account" : "TaskFlow";
-  elements.authSubmit.textContent = isSignup ? "Sign Up" : "Sign In";
+  elements.authSubmit.textContent = isSignup ? "Signup" : "Login";
   elements.authPassword.autocomplete = isSignup ? "new-password" : "current-password";
 }
 
@@ -400,7 +366,6 @@ function getDisplayName(user) {
   return "User";
 }
 
-// Lock / Unlock Page Scroll depending on Auth Overlay visibility
 function setScrollLock(locked) {
   if (locked) {
     document.body.classList.add("auth-active");
@@ -411,26 +376,43 @@ function setScrollLock(locked) {
   }
 }
 
+function updateUserInterface() {
+  const savedUser = JSON.parse(localStorage.getItem(STORAGE_KEYS.user) || "null");
+
+  if (!savedUser) {
+    elements.greetingTitle.textContent = "Stay productive 🚀";
+    elements.profileAvatar.textContent = "U";
+    elements.profileName.textContent = "TaskFlow User";
+    elements.profileEmail.textContent = "user@example.com";
+    return;
+  }
+
+  const displayName = getDisplayName(savedUser);
+  elements.greetingTitle.textContent = `Stay productive, ${displayName} 🚀`;
+  elements.profileAvatar.textContent = displayName.charAt(0).toUpperCase();
+  elements.profileName.textContent = displayName;
+  elements.profileEmail.textContent = savedUser.email;
+}
+
 async function handleAuth(event) {
   if (event) event.preventDefault();
-  showAuthError("");
 
   const email = elements.authEmail.value.trim();
   const password = elements.authPassword.value.trim();
   const name = elements.authName.value.trim();
 
   if (!email || !email.includes("@") || !email.includes(".")) {
-    showAuthError("Please enter a valid email address.");
+    showToast("Please enter a valid email address.");
     return;
   }
 
   if (password.length < 6) {
-    showAuthError("Password must be at least 6 characters.");
+    showToast("Password must be at least 6 characters.");
     return;
   }
 
   if (authMode === "signup" && name.length < 3) {
-    showAuthError("Please enter your full name (at least 3 characters).");
+    showToast("Please enter your full name (at least 3 characters).");
     return;
   }
 
@@ -449,7 +431,8 @@ async function handleAuth(event) {
       tokenStr = data.token;
       isOfflineMode = false;
     } catch (apiErr) {
-      console.warn("API Auth notice (switching to local session):", apiErr.message);
+      console.warn("API Auth notice:", apiErr.message);
+      // Fallback session handling
       userObj = { id: 1, name: name || email.split("@")[0], email };
       tokenStr = `tf_local_token_${Date.now()}`;
       isOfflineMode = true;
@@ -460,26 +443,13 @@ async function handleAuth(event) {
 
     setScrollLock(false);
     updateUserInterface();
-    showToast(authMode === "signup" ? "Account created. Welcome!" : "Welcome back!");
+    showToast(authMode === "signup" ? "Signup complete. Welcome!" : "Login successful.");
     await fetchTasksFromBackend();
   } catch (err) {
-    showAuthError(err.message || "Authentication failed.");
+    showToast(err.message || "Authentication failed.");
   } finally {
     elements.authSubmit.disabled = false;
   }
-}
-
-function handleQuickDemoLogin() {
-  elements.authEmail.value = "user@example.com";
-  elements.authPassword.value = "password123";
-  setAuthMode("login");
-  handleAuth();
-}
-
-function togglePasswordVisibility() {
-  const isPassword = elements.authPassword.type === "password";
-  elements.authPassword.type = isPassword ? "text" : "password";
-  elements.togglePasswordBtn.textContent = isPassword ? "🙈" : "👁️";
 }
 
 function logout() {
@@ -528,7 +498,7 @@ async function initializeApp() {
       updateUserInterface();
       await fetchTasksFromBackend();
     } catch (err) {
-      console.warn("Initial session validation notice:", err.message);
+      console.warn("Session check notice:", err.message);
       setScrollLock(false);
       updateUserInterface();
       await fetchTasksFromBackend();
@@ -549,12 +519,6 @@ elements.authForm.addEventListener("submit", handleAuth);
 elements.loginTab.addEventListener("click", () => setAuthMode("login"));
 elements.signupTab.addEventListener("click", () => setAuthMode("signup"));
 elements.menuToggle.addEventListener("click", () => elements.sidebar.classList.toggle("open"));
-if (elements.demoAuthButton) {
-  elements.demoAuthButton.addEventListener("click", handleQuickDemoLogin);
-}
-if (elements.togglePasswordBtn) {
-  elements.togglePasswordBtn.addEventListener("click", togglePasswordVisibility);
-}
 
 elements.filterButtons.forEach((button) => {
   button.addEventListener("click", () => setFilter(button.dataset.filter));

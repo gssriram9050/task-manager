@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="TaskFlow - A responsive full-stack task management application with PostgreSQL persistence.">
+  <meta name="description" content="TaskFlow - A responsive task management application for organizing daily tasks.">
   <title>TaskFlow - Task Management Application</title>
-  <link rel="stylesheet" href="style.css?v=2.0">
+  <link rel="stylesheet" href="style.css?v=3.0">
 </head>
 <body class="auth-active">
   <div class="app-shell" id="appShell">
@@ -52,7 +52,7 @@
         <div class="hero-copy">
           <p class="eyebrow">Daily Focus</p>
           <h2>Organize tasks, track progress, and finish the day with clarity.</h2>
-          <p>Full-stack task persistence powered by Node.js, Express, and relational Database storage.</p>
+          <p>All data stays in your browser using localStorage, making this project simple, private, and GitHub Pages friendly.</p>
         </div>
         <div class="hero-orbit" aria-hidden="true">
           <span class="orbit-card">Plan</span>
@@ -90,7 +90,7 @@
         </div>
 
         <form class="task-form" id="taskForm">
-          <input id="taskTitle" type="text" placeholder="Enter your task..." maxlength="120" autocomplete="off" required>
+          <input id="taskTitle" type="text" placeholder="Enter your task..." maxlength="80" autocomplete="off" required>
           <select id="taskPriority" aria-label="Task priority">
             <option value="High">High Priority</option>
             <option value="Medium" selected>Medium Priority</option>
@@ -119,8 +119,8 @@
       </section>
 
       <footer class="footer" id="footer">
-        <p>TaskFlow - Full-Stack Task Management Application.</p>
-        <p>Built with HTML, CSS, JavaScript, Node.js, Express, and PostgreSQL/SQLite Database.</p>
+        <p>TaskFlow - Task Management Application.</p>
+        <p>Built with HTML, CSS, Vanilla JavaScript, and localStorage.</p>
       </footer>
     </main>
   </div>
@@ -140,38 +140,27 @@
         <button class="auth-tab" id="signupTab" type="button">Signup</button>
       </div>
 
-      <div class="auth-error-box hidden" id="authError"></div>
-
       <form id="authForm" class="auth-form">
         <div class="form-field" id="nameField">
           <label for="authName">Full Name</label>
-          <input id="authName" type="text" placeholder="Your full name" autocomplete="name">
+          <input id="authName" type="text" placeholder="Your name" autocomplete="name">
         </div>
         <div class="form-field">
-          <label for="authEmail">Email Address</label>
+          <label for="authEmail">Email</label>
           <input id="authEmail" type="email" placeholder="user@example.com" autocomplete="email" required>
         </div>
         <div class="form-field">
           <label for="authPassword">Password</label>
-          <div class="password-wrapper">
-            <input id="authPassword" type="password" placeholder="Minimum 6 characters" autocomplete="current-password" required>
-            <button type="button" class="toggle-password" id="togglePasswordBtn" aria-label="Toggle password visibility">👁️</button>
-          </div>
+          <input id="authPassword" type="password" placeholder="Minimum 6 characters" autocomplete="current-password" required>
         </div>
-        <button class="primary-button full-width" id="authSubmit" type="submit">Sign In</button>
+        <button class="primary-button full-width" id="authSubmit" type="submit">Login</button>
       </form>
 
-      <div class="auth-divider">
-        <span>OR</span>
-      </div>
-
-      <button class="secondary-button full-width demo-button" id="demoAuthButton" type="button">⚡ Quick Demo Login</button>
-
-      <p class="auth-note">Sign in to access your task management workspace.</p>
+      <p class="auth-note">Frontend-only validation for a static GitHub Pages project.</p>
     </section>
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="script.js?v=2.0"></script>
+  <script src="script.js?v=3.0"></script>
 </body>
 </html>
