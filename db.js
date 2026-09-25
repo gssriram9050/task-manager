@@ -1,5 +1,17 @@
 let pgPool = null;
 
+// In-memory / JSON store fallback for zero-dependency local Node execution
+const localMemoryStore = {
+  users: [
+    { id: 1, email: 'user@example.com', name: 'TaskFlow User', password_hash: 'password123', created_at: new Date().toISOString() }
+  ],
+  tasks: [
+    { id: 'task-seed-1', user_id: 1, title: 'Complete Thiranex Task Management Project', priority: 'High', due_date: new Date().toISOString().split('T')[0], completed: false, created_at: new Date().toISOString() },
+    { id: 'task-seed-2', user_id: 1, title: 'Verify PostgreSQL Database & Cloudflare Worker Deployment', priority: 'High', due_date: new Date().toISOString().split('T')[0], completed: false, created_at: new Date().toISOString() },
+    { id: 'task-seed-3', user_id: 1, title: 'Review Responsive Task Manager UI & Dark Mode Theme', priority: 'Medium', due_date: new Date().toISOString().split('T')[0], completed: true, created_at: new Date().toISOString() }
+  ]
+};
+
 function getDbConfig(env) {
   let connectionString = null;
   if (env && typeof env === 'object') {
@@ -33,7 +45,7 @@ async function getPgPool(env) {
 }
 
 export function query(sql, params = [], env = null) {
-  return new Promise(async (resolve, reject) => {
+  return new Promise(async (resolve) => {
     const { connectionString, isPostgres } = getDbConfig(env);
 
     if (isPostgres || connectionString) {
@@ -56,36 +68,8 @@ export function query(sql, params = [], env = null) {
         return resolve([]);
       }
     } else {
-      // Local Node.js SQLite fallback
-      try {
-        if (typeof process !== 'undefined' && process.versions && process.versions.node && !process.versions.workerd) {
-          const path = await import('path');
-          const { fileURLToPath } = await import('url');
-          const sqlite3Module = await import('sqlite3');
-          const sqlite3 = sqlite3Module.default || sqlite3Module;
-          const __filename = fileURLToPath(import.meta.url);
-          const __dirname = path.dirname(__filename);
-          const dbPath = path.join(__dirname, 'taskmanager.db');
-          const sqliteDb = new sqlite3.verbose().Database(dbPath);
-
-          const isSelect = sql.trim().toUpperCase().startsWith('SELECT');
-          if (isSelect) {
-            sqliteDb.all(sql, params, (err, rows) => {
-              if (err) return resolve([]);
-              resolve(rows || []);
-            });
-          } else {
-            sqliteDb.run(sql, params, function (err) {
-              if (err) return resolve([]);
-              resolve({ lastID: this.lastID, changes: this.changes });
-            });
-          }
-        } else {
-          return resolve([]);
-        }
-      } catch (err) {
-        return resolve([]);
-      }
+      // Local zero-dependency store fallback
+      resolve([]);
     }
   });
 }
@@ -94,30 +78,32 @@ export async function initDb(env = null) {
   const { connectionString } = getDbConfig(env);
   const usePostgres = Boolean(connectionString);
 
-  const createTablesSql = [
-    `CREATE TABLE IF NOT EXISTS users (
-      id ${usePostgres ? 'INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'},
-      email TEXT UNIQUE NOT NULL,
-      name TEXT NOT NULL,
-      password_hash TEXT NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );`,
-    `CREATE TABLE IF NOT EXISTS tasks (
-      id TEXT PRIMARY KEY,
-      user_id INTEGER NOT NULL,
-      title TEXT NOT NULL,
-      priority TEXT DEFAULT 'Medium',
-      due_date TEXT,
-      completed ${usePostgres ? 'BOOLEAN' : 'INTEGER'} DEFAULT ${usePostgres ? 'FALSE' : '0'},
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );`
-  ];
+  if (usePostgres) {
+    const createTablesSql = [
+      `CREATE TABLE IF NOT EXISTS users (
+        id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
+      `CREATE TABLE IF NOT EXISTS tasks (
+        id TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        priority TEXT DEFAULT 'Medium',
+        due_date TEXT,
+        completed BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`
+    ];
 
-  for (const sql of createTablesSql) {
-    await query(sql, [], env);
+    for (const sql of createTablesSql) {
+      await query(sql, [], env);
+    }
+
+    await seedInitialData(env);
   }
-
-  await seedInitialData(env);
 }
 
 async function seedInitialData(env = null) {
@@ -125,7 +111,6 @@ async function seedInitialData(env = null) {
     const usersCount = await query('SELECT COUNT(*) as count FROM users', [], env);
     const countVal = parseInt(usersCount[0]?.count || usersCount[0]?.COUNT || 0, 10);
     if (countVal === 0) {
-      // Create default demo user
       await query(
         `INSERT INTO users (email, name, password_hash) VALUES (?, ?, ?)`,
         ['user@example.com', 'TaskFlow User', 'password123'],
@@ -177,82 +162,147 @@ async function seedInitialData(env = null) {
 }
 
 export async function findUserByEmail(email, env = null) {
-  const rows = await query('SELECT * FROM users WHERE LOWER(email) = LOWER(?)', [email], env);
-  return rows[0] || null;
+  const { isPostgres } = getDbConfig(env);
+  if (isPostgres) {
+    const rows = await query('SELECT * FROM users WHERE LOWER(email) = LOWER(?)', [email], env);
+    return rows[0] || null;
+  }
+  return localMemoryStore.users.find(u => u.email.toLowerCase() === email.toLowerCase()) || null;
 }
 
 export async function findUserById(id, env = null) {
-  const rows = await query('SELECT * FROM users WHERE id = ?', [id], env);
-  return rows[0] || null;
+  const { isPostgres } = getDbConfig(env);
+  if (isPostgres) {
+    const rows = await query('SELECT * FROM users WHERE id = ?', [id], env);
+    return rows[0] || null;
+  }
+  return localMemoryStore.users.find(u => Number(u.id) === Number(id)) || null;
 }
 
 export async function createUser(email, name, password, env = null) {
-  await query(
-    'INSERT INTO users (email, name, password_hash) VALUES (?, ?, ?)',
-    [email, name, password],
-    env
-  );
-  return await findUserByEmail(email, env);
+  const { isPostgres } = getDbConfig(env);
+  if (isPostgres) {
+    await query(
+      'INSERT INTO users (email, name, password_hash) VALUES (?, ?, ?)',
+      [email, name, password],
+      env
+    );
+    return await findUserByEmail(email, env);
+  }
+  const newUser = {
+    id: localMemoryStore.users.length + 1,
+    email,
+    name,
+    password_hash: password,
+    created_at: new Date().toISOString()
+  };
+  localMemoryStore.users.push(newUser);
+  return newUser;
 }
 
 export async function getUserTasks(userId, env = null) {
-  const rows = await query(
-    'SELECT * FROM tasks WHERE user_id = ? ORDER BY created_at DESC',
-    [userId],
-    env
-  );
-  return rows.map(r => ({
-    ...r,
-    completed: Boolean(r.completed)
-  }));
+  const { isPostgres } = getDbConfig(env);
+  if (isPostgres) {
+    const rows = await query(
+      'SELECT * FROM tasks WHERE user_id = ? ORDER BY created_at DESC',
+      [userId],
+      env
+    );
+    return rows.map(r => ({
+      ...r,
+      completed: Boolean(r.completed)
+    }));
+  }
+  return localMemoryStore.tasks.filter(t => Number(t.user_id) === Number(userId));
 }
 
 export async function getTaskById(taskId, userId, env = null) {
-  const rows = await query(
-    'SELECT * FROM tasks WHERE id = ? AND user_id = ?',
-    [taskId, userId],
-    env
-  );
-  if (!rows[0]) return null;
-  return {
-    ...rows[0],
-    completed: Boolean(rows[0].completed)
-  };
+  const { isPostgres } = getDbConfig(env);
+  if (isPostgres) {
+    const rows = await query(
+      'SELECT * FROM tasks WHERE id = ? AND user_id = ?',
+      [taskId, userId],
+      env
+    );
+    if (!rows[0]) return null;
+    return {
+      ...rows[0],
+      completed: Boolean(rows[0].completed)
+    };
+  }
+  return localMemoryStore.tasks.find(t => String(t.id) === String(taskId) && Number(t.user_id) === Number(userId)) || null;
 }
 
 export async function createTask(id, userId, title, priority, dueDate, completed, env = null) {
-  await query(
-    'INSERT INTO tasks (id, user_id, title, priority, due_date, completed) VALUES (?, ?, ?, ?, ?, ?)',
-    [id, userId, title, priority, dueDate || null, Boolean(completed)],
-    env
-  );
-  return await getTaskById(id, userId, env);
+  const { isPostgres } = getDbConfig(env);
+  if (isPostgres) {
+    await query(
+      'INSERT INTO tasks (id, user_id, title, priority, due_date, completed) VALUES (?, ?, ?, ?, ?, ?)',
+      [id, userId, title, priority, dueDate || null, Boolean(completed)],
+      env
+    );
+    return await getTaskById(id, userId, env);
+  }
+  const newTask = {
+    id,
+    user_id: userId,
+    title,
+    priority: priority || 'Medium',
+    due_date: dueDate || null,
+    completed: Boolean(completed),
+    created_at: new Date().toISOString()
+  };
+  localMemoryStore.tasks.unshift(newTask);
+  return newTask;
 }
 
 export async function updateTask(id, userId, title, priority, dueDate, env = null) {
-  await query(
-    'UPDATE tasks SET title = ?, priority = ?, due_date = ? WHERE id = ? AND user_id = ?',
-    [title, priority, dueDate || null, id, userId],
-    env
-  );
-  return await getTaskById(id, userId, env);
+  const { isPostgres } = getDbConfig(env);
+  if (isPostgres) {
+    await query(
+      'UPDATE tasks SET title = ?, priority = ?, due_date = ? WHERE id = ? AND user_id = ?',
+      [title, priority, dueDate || null, id, userId],
+      env
+    );
+    return await getTaskById(id, userId, env);
+  }
+  const task = await getTaskById(id, userId, env);
+  if (task) {
+    task.title = title;
+    task.priority = priority;
+    task.due_date = dueDate || null;
+  }
+  return task;
 }
 
 export async function toggleTask(id, userId, completed, env = null) {
-  await query(
-    'UPDATE tasks SET completed = ? WHERE id = ? AND user_id = ?',
-    [Boolean(completed), id, userId],
-    env
-  );
-  return await getTaskById(id, userId, env);
+  const { isPostgres } = getDbConfig(env);
+  if (isPostgres) {
+    await query(
+      'UPDATE tasks SET completed = ? WHERE id = ? AND user_id = ?',
+      [Boolean(completed), id, userId],
+      env
+    );
+    return await getTaskById(id, userId, env);
+  }
+  const task = await getTaskById(id, userId, env);
+  if (task) {
+    task.completed = Boolean(completed);
+  }
+  return task;
 }
 
 export async function deleteTask(id, userId, env = null) {
-  await query(
-    'DELETE FROM tasks WHERE id = ? AND user_id = ?',
-    [id, userId],
-    env
-  );
+  const { isPostgres } = getDbConfig(env);
+  if (isPostgres) {
+    await query(
+      'DELETE FROM tasks WHERE id = ? AND user_id = ?',
+      [id, userId],
+      env
+    );
+  } else {
+    localMemoryStore.tasks = localMemoryStore.tasks.filter(t => !(String(t.id) === String(id) && Number(t.user_id) === Number(userId)));
+  }
   return { success: true };
 }
 

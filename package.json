@@ -2,10 +2,11 @@
   "name": "task-manager",
   "version": "1.0.0",
   "type": "module",
-  "description": "Full-Stack Task Management Application built with Node.js, Express, HTML/CSS/JavaScript, and PostgreSQL/SQLite database.",
+  "description": "Full-Stack Task Management Application built with Node.js, Express, HTML/CSS/JavaScript, and PostgreSQL database.",
   "main": "worker.js",
   "scripts": {
     "start": "node server.js",
+    "build": "wrangler deploy --dry-run",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy"
   },
@@ -15,7 +16,6 @@
     "express",
     "javascript",
     "postgresql",
-    "sqlite",
     "cloudflare-workers"
   ],
   "author": "",
@@ -25,8 +25,6 @@
     "dotenv": "^18.0.3",
     "express": "^5.2.1",
     "pg": "^8.23.0",
-    "serverless-http": "^4.0.0",
-    "sqlite3": "^6.0.1",
     "wrangler": "^4.140.0"
   }
 }
