@@ -7,6 +7,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Serve static frontend files when running standalone
+app.use(express.static('public'));
+
 // Token generator and helper
 function generateToken(user) {
   const payload = `${user.id}:${user.email}:${Date.now()}`;
@@ -66,7 +69,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // User Registration
-app.post('/api/auth/register', async (req, res) => {
+app.post(['/api/auth/register', '/api/auth/register/'], async (req, res) => {
   try {
     const { name, email, password } = req.body || {};
     const env = req.env || null;
@@ -103,7 +106,7 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 // User Login
-app.post('/api/auth/login', async (req, res) => {
+app.post(['/api/auth/login', '/api/auth/login/'], async (req, res) => {
   try {
     const { email, password } = req.body || {};
     const env = req.env || null;
@@ -133,7 +136,7 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // Get Current User Profile
-app.get('/api/auth/me', authMiddleware, (req, res) => {
+app.get(['/api/auth/me', '/api/auth/me/'], authMiddleware, (req, res) => {
   res.json({
     user: {
       id: req.user.id,
@@ -144,7 +147,7 @@ app.get('/api/auth/me', authMiddleware, (req, res) => {
 });
 
 // Task Operations - Get User Tasks
-app.get('/api/tasks', authMiddleware, async (req, res) => {
+app.get(['/api/tasks', '/api/tasks/'], authMiddleware, async (req, res) => {
   try {
     const env = req.env || null;
     const tasks = await db.getUserTasks(req.user.id, env);
@@ -155,7 +158,7 @@ app.get('/api/tasks', authMiddleware, async (req, res) => {
 });
 
 // Task Operations - Create Task
-app.post('/api/tasks', authMiddleware, async (req, res) => {
+app.post(['/api/tasks', '/api/tasks/'], authMiddleware, async (req, res) => {
   try {
     const { title, priority, dueDate, completed } = req.body || {};
     const env = req.env || null;
@@ -240,6 +243,17 @@ app.delete('/api/tasks/:id', authMiddleware, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete task: ' + err.message });
   }
+});
+
+// Catch-all 404 handler for API routes to guarantee JSON output
+app.use('/api/*', (req, res) => {
+  res.status(404).json({ error: `API route not found: ${req.method} ${req.originalUrl}` });
+});
+
+// Express Error Handler Middleware to guarantee JSON output
+app.use((err, req, res, next) => {
+  console.error('Express Internal Error:', err);
+  res.status(500).json({ error: err.message || 'Internal Server Error' });
 });
 
 // Local Node.js standalone server runner

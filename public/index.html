@@ -7,8 +7,8 @@
   <title>TaskFlow - Task Management Application</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <div class="app-shell">
+<body class="auth-active">
+  <div class="app-shell" id="appShell">
     <aside class="sidebar" id="sidebar">
       <div class="brand">
         <span class="brand-mark">TF</span>
@@ -140,23 +140,34 @@
         <button class="auth-tab" id="signupTab" type="button">Signup</button>
       </div>
 
+      <div class="auth-error-box hidden" id="authError"></div>
+
       <form id="authForm" class="auth-form">
         <div class="form-field" id="nameField">
           <label for="authName">Full Name</label>
-          <input id="authName" type="text" placeholder="Your name" autocomplete="name">
+          <input id="authName" type="text" placeholder="Your full name" autocomplete="name">
         </div>
         <div class="form-field">
-          <label for="authEmail">Email</label>
+          <label for="authEmail">Email Address</label>
           <input id="authEmail" type="email" placeholder="user@example.com" autocomplete="email" required>
         </div>
         <div class="form-field">
           <label for="authPassword">Password</label>
-          <input id="authPassword" type="password" placeholder="Minimum 6 characters" autocomplete="current-password" required>
+          <div class="password-wrapper">
+            <input id="authPassword" type="password" placeholder="Minimum 6 characters" autocomplete="current-password" required>
+            <button type="button" class="toggle-password" id="togglePasswordBtn" aria-label="Toggle password visibility">👁️</button>
+          </div>
         </div>
-        <button class="primary-button full-width" id="authSubmit" type="submit">Login</button>
+        <button class="primary-button full-width" id="authSubmit" type="submit">Sign In</button>
       </form>
 
-      <p class="auth-note">Secure authentication backed by database persistence.</p>
+      <div class="auth-divider">
+        <span>OR</span>
+      </div>
+
+      <button class="secondary-button full-width demo-button" id="demoAuthButton" type="button">⚡ Quick Demo Login</button>
+
+      <p class="auth-note">Sign in to access your task management workspace.</p>
     </section>
   </div>
 

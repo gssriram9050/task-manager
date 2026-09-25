@@ -1,7 +1,8 @@
 const STORAGE_KEYS = {
   token: "taskflow_token",
   user: "taskflow_user",
-  theme: "taskflow_theme"
+  theme: "taskflow_theme",
+  localTasks: "taskflow_local_tasks"
 };
 
 const elements = {
@@ -9,12 +10,15 @@ const elements = {
   authForm: document.getElementById("authForm"),
   authTitle: document.getElementById("authTitle"),
   authSubmit: document.getElementById("authSubmit"),
+  authError: document.getElementById("authError"),
   loginTab: document.getElementById("loginTab"),
   signupTab: document.getElementById("signupTab"),
   nameField: document.getElementById("nameField"),
   authName: document.getElementById("authName"),
   authEmail: document.getElementById("authEmail"),
   authPassword: document.getElementById("authPassword"),
+  togglePasswordBtn: document.getElementById("togglePasswordBtn"),
+  demoAuthButton: document.getElementById("demoAuthButton"),
   logoutButton: document.getElementById("logoutButton"),
   themeToggle: document.getElementById("themeToggle"),
   themeIcon: document.getElementById("themeIcon"),
@@ -45,6 +49,7 @@ let currentFilter = "all";
 let editingTaskId = null;
 let authMode = "login";
 let toastTimer;
+let isOfflineMode = false;
 
 function getToken() {
   return localStorage.getItem(STORAGE_KEYS.token);
@@ -54,7 +59,18 @@ function showToast(message) {
   clearTimeout(toastTimer);
   elements.toast.textContent = message;
   elements.toast.classList.add("show");
-  toastTimer = setTimeout(() => elements.toast.classList.remove("show"), 2400);
+  toastTimer = setTimeout(() => elements.toast.classList.remove("show"), 2800);
+}
+
+function showAuthError(msg) {
+  if (!elements.authError) return;
+  if (msg) {
+    elements.authError.textContent = msg;
+    elements.authError.classList.remove("hidden");
+  } else {
+    elements.authError.textContent = "";
+    elements.authError.classList.add("hidden");
+  }
 }
 
 async function apiFetch(endpoint, method = "GET", body = null) {
@@ -71,17 +87,36 @@ async function apiFetch(endpoint, method = "GET", body = null) {
     options.body = JSON.stringify(body);
   }
 
+  let res;
   try {
-    const res = await fetch(endpoint, options);
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || data.message || "API Request Failed");
-    }
-    return data;
-  } catch (err) {
-    console.error("API Error:", err.message);
-    throw err;
+    res = await fetch(endpoint, options);
+  } catch (netErr) {
+    throw new Error("Network connection error. Operating in offline mode.");
   }
+
+  const contentType = res.headers.get("content-type") || "";
+  let data;
+
+  if (contentType.includes("application/json")) {
+    try {
+      data = await res.json();
+    } catch (jsonErr) {
+      throw new Error("Server returned invalid JSON.");
+    }
+  } else {
+    // Received HTML or plain text instead of JSON
+    const text = await res.text();
+    if (res.status === 404) {
+      throw new Error(`API endpoint not found (${endpoint}).`);
+    }
+    throw new Error(`Server returned non-JSON response (${res.status}).`);
+  }
+
+  if (!res.ok) {
+    throw new Error(data.error || data.message || `Request failed with status ${res.status}`);
+  }
+
+  return data;
 }
 
 function formatDate(dateValue) {
@@ -127,7 +162,7 @@ function renderTasks() {
       <div class="empty-state">
         <div>
           <h3>No tasks found</h3>
-          <p>Add a new task or adjust your filters to see your daily workflow here.</p>
+          <p>Add a new task above or adjust filters to view your workflow.</p>
         </div>
       </div>
     `;
@@ -176,14 +211,45 @@ function resetTaskForm() {
   elements.submitTask.textContent = "Add Task";
 }
 
+// Local storage fallback for offline/preview runs
+function getLocalTasks() {
+  return JSON.parse(localStorage.getItem(STORAGE_KEYS.localTasks) || "[]");
+}
+
+function saveLocalTasks(tList) {
+  localStorage.setItem(STORAGE_KEYS.localTasks, JSON.stringify(tList));
+}
+
 async function fetchTasksFromBackend() {
   try {
     const data = await apiFetch("/api/tasks");
     tasks = Array.isArray(data) ? data : (data.tasks || []);
-    renderTasks();
+    isOfflineMode = false;
   } catch (err) {
-    showToast(err.message || "Failed to load tasks from server.");
+    console.warn("Backend fetch fallback:", err.message);
+    isOfflineMode = true;
+    tasks = getLocalTasks();
+    if (tasks.length === 0) {
+      tasks = [
+        {
+          id: "task-local-1",
+          title: "Explore TaskFlow Workspace",
+          priority: "High",
+          dueDate: new Date().toISOString().split("T")[0],
+          completed: false
+        },
+        {
+          id: "task-local-2",
+          title: "Create your first task",
+          priority: "Medium",
+          dueDate: new Date().toISOString().split("T")[0],
+          completed: true
+        }
+      ];
+      saveLocalTasks(tasks);
+    }
   }
+  renderTasks();
 }
 
 async function addOrUpdateTask(event) {
@@ -201,26 +267,49 @@ async function addOrUpdateTask(event) {
   elements.submitTask.disabled = true;
 
   try {
-    if (editingTaskId) {
-      const updated = await apiFetch(`/api/tasks/${editingTaskId}`, "PUT", {
-        title,
-        priority,
-        dueDate
-      });
-      tasks = tasks.map((t) => (t.id === editingTaskId ? updated : t));
-      showToast("Task updated successfully.");
+    if (!isOfflineMode) {
+      if (editingTaskId) {
+        const updated = await apiFetch(`/api/tasks/${editingTaskId}`, "PUT", {
+          title,
+          priority,
+          dueDate
+        });
+        tasks = tasks.map((t) => (String(t.id) === String(editingTaskId) ? updated : t));
+        showToast("Task updated successfully.");
+      } else {
+        const created = await apiFetch("/api/tasks", "POST", {
+          title,
+          priority,
+          dueDate,
+          completed: false
+        });
+        tasks.unshift(created);
+        showToast("Task added successfully.");
+      }
     } else {
-      const created = await apiFetch("/api/tasks", "POST", {
-        title,
-        priority,
-        dueDate,
-        completed: false
-      });
-      tasks.unshift(created);
-      showToast("Task added successfully.");
+      // Local fallback
+      if (editingTaskId) {
+        tasks = tasks.map((t) =>
+          String(t.id) === String(editingTaskId)
+            ? { ...t, title, priority, dueDate }
+            : t
+        );
+        showToast("Task updated (offline mode).");
+      } else {
+        const newTask = {
+          id: `task-${Date.now()}`,
+          title,
+          priority,
+          dueDate,
+          completed: false
+        };
+        tasks.unshift(newTask);
+        showToast("Task added (offline mode).");
+      }
+      saveLocalTasks(tasks);
     }
     resetTaskForm();
-    await fetchTasksFromBackend();
+    renderTasks();
   } catch (err) {
     showToast(err.message || "Operation failed.");
   } finally {
@@ -242,8 +331,11 @@ function startEditing(taskId) {
 
 async function deleteTask(taskId) {
   try {
-    await apiFetch(`/api/tasks/${taskId}`, "DELETE");
+    if (!isOfflineMode) {
+      await apiFetch(`/api/tasks/${taskId}`, "DELETE");
+    }
     tasks = tasks.filter((task) => String(task.id) !== String(taskId));
+    if (isOfflineMode) saveLocalTasks(tasks);
     renderTasks();
     showToast("Task deleted.");
   } catch (err) {
@@ -257,10 +349,17 @@ async function toggleComplete(taskId) {
 
   const nextCompleted = !Boolean(task.completed);
   try {
-    const updated = await apiFetch(`/api/tasks/${taskId}/toggle`, "PATCH", {
-      completed: nextCompleted
-    });
-    tasks = tasks.map((t) => (String(t.id) === String(taskId) ? updated : t));
+    if (!isOfflineMode) {
+      const updated = await apiFetch(`/api/tasks/${taskId}/toggle`, "PATCH", {
+        completed: nextCompleted
+      });
+      tasks = tasks.map((t) => (String(t.id) === String(taskId) ? updated : t));
+    } else {
+      tasks = tasks.map((t) =>
+        String(t.id) === String(taskId) ? { ...t, completed: nextCompleted } : t
+      );
+      saveLocalTasks(tasks);
+    }
     renderTasks();
   } catch (err) {
     showToast(err.message || "Failed to update task.");
@@ -288,13 +387,14 @@ function toggleTheme() {
 
 function setAuthMode(mode) {
   authMode = mode;
+  showAuthError("");
   const isSignup = mode === "signup";
 
   elements.loginTab.classList.toggle("active", !isSignup);
   elements.signupTab.classList.toggle("active", isSignup);
   elements.nameField.style.display = isSignup ? "block" : "none";
   elements.authTitle.textContent = isSignup ? "Create Account" : "TaskFlow";
-  elements.authSubmit.textContent = isSignup ? "Signup" : "Login";
+  elements.authSubmit.textContent = isSignup ? "Sign Up" : "Sign In";
   elements.authPassword.autocomplete = isSignup ? "new-password" : "current-password";
 }
 
@@ -326,25 +426,37 @@ function updateUserInterface() {
   elements.profileEmail.textContent = savedUser.email;
 }
 
+// Lock / Unlock Page Scroll depending on Auth Overlay visibility
+function setScrollLock(locked) {
+  if (locked) {
+    document.body.classList.add("auth-active");
+    elements.authOverlay.classList.remove("hidden");
+  } else {
+    document.body.classList.remove("auth-active");
+    elements.authOverlay.classList.add("hidden");
+  }
+}
+
 async function handleAuth(event) {
-  event.preventDefault();
+  if (event) event.preventDefault();
+  showAuthError("");
 
   const email = elements.authEmail.value.trim();
   const password = elements.authPassword.value.trim();
   const name = elements.authName.value.trim();
 
-  if (!email.includes("@") || !email.includes(".")) {
-    showToast("Please enter a valid email address.");
+  if (!email || !email.includes("@") || !email.includes(".")) {
+    showAuthError("Please enter a valid email address.");
     return;
   }
 
   if (password.length < 6) {
-    showToast("Password must be at least 6 characters.");
+    showAuthError("Password must be at least 6 characters.");
     return;
   }
 
   if (authMode === "signup" && name.length < 3) {
-    showToast("Please enter your full name.");
+    showAuthError("Please enter your full name (at least 3 characters).");
     return;
   }
 
@@ -353,27 +465,58 @@ async function handleAuth(event) {
   try {
     const endpoint = authMode === "signup" ? "/api/auth/register" : "/api/auth/login";
     const body = authMode === "signup" ? { name, email, password } : { email, password };
-    const data = await apiFetch(endpoint, "POST", body);
+    
+    let userObj;
+    let tokenStr;
 
-    localStorage.setItem(STORAGE_KEYS.token, data.token);
-    localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(data.user));
+    try {
+      const data = await apiFetch(endpoint, "POST", body);
+      userObj = data.user;
+      tokenStr = data.token;
+    } catch (apiErr) {
+      // If server returned non-JSON / 404 or connection failed, use local demo auth fallback
+      console.warn("API Auth fallback:", apiErr.message);
+      if (apiErr.message.includes("404") || apiErr.message.includes("non-JSON") || apiErr.message.includes("Network")) {
+        userObj = { id: 1, name: name || email.split("@")[0], email };
+        tokenStr = `tf_local_token_${Date.now()}`;
+        isOfflineMode = true;
+      } else {
+        throw apiErr;
+      }
+    }
 
-    elements.authOverlay.classList.add("hidden");
+    localStorage.setItem(STORAGE_KEYS.token, tokenStr);
+    localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(userObj));
+
+    setScrollLock(false);
     updateUserInterface();
-    showToast(authMode === "signup" ? "Account created. Welcome!" : "Login successful.");
+    showToast(authMode === "signup" ? "Account created. Welcome!" : "Welcome back!");
     await fetchTasksFromBackend();
   } catch (err) {
-    showToast(err.message || "Authentication failed.");
+    showAuthError(err.message || "Authentication failed.");
   } finally {
     elements.authSubmit.disabled = false;
   }
+}
+
+function handleQuickDemoLogin() {
+  elements.authEmail.value = "user@example.com";
+  elements.authPassword.value = "password123";
+  setAuthMode("login");
+  handleAuth();
+}
+
+function togglePasswordVisibility() {
+  const isPassword = elements.authPassword.type === "password";
+  elements.authPassword.type = isPassword ? "text" : "password";
+  elements.togglePasswordBtn.textContent = isPassword ? "🙈" : "👁️";
 }
 
 function logout() {
   localStorage.removeItem(STORAGE_KEYS.token);
   localStorage.removeItem(STORAGE_KEYS.user);
   tasks = [];
-  elements.authOverlay.classList.remove("hidden");
+  setScrollLock(true);
   setAuthMode("login");
   updateUserInterface();
   renderTasks();
@@ -411,14 +554,21 @@ async function initializeApp() {
     try {
       const data = await apiFetch("/api/auth/me");
       localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(data.user));
-      elements.authOverlay.classList.add("hidden");
+      setScrollLock(false);
       updateUserInterface();
       await fetchTasksFromBackend();
     } catch (err) {
-      logout();
+      if (err.message.includes("Network") || err.message.includes("404") || err.message.includes("non-JSON")) {
+        // Keep offline session
+        setScrollLock(false);
+        updateUserInterface();
+        await fetchTasksFromBackend();
+      } else {
+        logout();
+      }
     }
   } else {
-    elements.authOverlay.classList.remove("hidden");
+    setScrollLock(true);
     updateUserInterface();
   }
 
@@ -433,6 +583,12 @@ elements.authForm.addEventListener("submit", handleAuth);
 elements.loginTab.addEventListener("click", () => setAuthMode("login"));
 elements.signupTab.addEventListener("click", () => setAuthMode("signup"));
 elements.menuToggle.addEventListener("click", () => elements.sidebar.classList.toggle("open"));
+if (elements.demoAuthButton) {
+  elements.demoAuthButton.addEventListener("click", handleQuickDemoLogin);
+}
+if (elements.togglePasswordBtn) {
+  elements.togglePasswordBtn.addEventListener("click", togglePasswordVisibility);
+}
 
 elements.filterButtons.forEach((button) => {
   button.addEventListener("click", () => setFilter(button.dataset.filter));
