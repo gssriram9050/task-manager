@@ -1,118 +1,113 @@
-# TaskFlow - Task Management Application
+# TaskFlow - Full-Stack Task Management Application
 
-TaskFlow is a modern, responsive task management web application built with only HTML, CSS, and Vanilla JavaScript. It helps users add, edit, complete, delete, search, and filter daily tasks directly in the browser.
+## Overview
+TaskFlow is a modern, full-stack, database-driven task management application designed to organize daily workflows, track task completion, set priorities, and maintain productivity with ease. Built with a 3-tier web architecture (**Frontend HTML/CSS/JS → Node.js/Express REST API → PostgreSQL/SQLite Database**), TaskFlow provides persistent multi-user task management and user authentication.
 
-This project is fully static and ready for GitHub Pages deployment.
+## Thiranex Internship Context
+This project was developed and deployed as part of the **Full Stack Development Internship** at **Thiranex Education LLP**. It demonstrates practical competency in building end-to-end full-stack software applications, server-side REST API development, database schema management with relational engines, and production deployment on **Cloudflare Workers**.
 
-## Live Demo
+---
 
-After deploying with GitHub Pages, add your live link here:
+## Core Features
+- **User Authentication & Authorization**: Secure signup, login, and user session management.
+- **Task CRUD Operations**: Create, view, edit, toggle completion, and delete tasks.
+- **Priority & Due Date Tracking**: Assign High, Medium, or Low priority tags and due dates to tasks.
+- **Search & Filtering**: Instant client-side search by title and filter by All, Pending, or Completed tasks.
+- **Persistent Data Storage**: All users, credentials, and task records are persisted in a relational SQL database (**PostgreSQL** in production / **SQLite** for local development).
+- **Responsive Dark/Light UI**: Glassmorphic dashboard interface optimized for mobile, tablet, and desktop viewports.
+- **Cloudflare Worker Deployment**: Serverless backend execution with global edge asset hosting.
 
-```text
-https://gssriram9050.github.io/task-manager/
-```
+---
 
-## Project Preview
-
-TaskFlow includes a clean dashboard-style interface with a dark/light theme, task statistics, localStorage persistence, smooth animations, and a responsive layout for mobile and desktop screens.
-
-## Features
-
-- Frontend-only login and signup modal with JavaScript validation
-- Dashboard layout after login
-- Add new tasks
-- Edit existing tasks
-- Delete tasks
-- Mark tasks as completed
-- Set task priority: High, Medium, or Low
-- Add optional due dates
-- Filter tasks by All, Completed, and Pending
-- Search tasks in real time
-- Task counters and statistics
-- Empty state when no tasks are available
-- Dark and light mode toggle
-- Theme preference saved in localStorage
-- Tasks saved in localStorage
-- Toast notification system
-- Keyboard Enter support for adding tasks
-- Responsive sidebar/navigation
-- Smooth transitions, hover effects, and scroll animations
-
-## Tech Stack
-
-- HTML5
-- CSS3
-- Vanilla JavaScript
-- localStorage
-
-No React, Node.js, npm, backend, API, database, Firebase, framework, or external hosting is required.
-
-## Folder Structure
+## Architecture & Tech Stack
 
 ```text
-taskflow-task-management/
-├── index.html
-├── style.css
-├── script.js
-└── README.md
+[ Client / Web UI ] <--- HTTP REST API ---> [ Express.js Backend ] <---> [ Relational Database ]
+ (HTML, CSS, JS)                             (Node.js / Worker)         (PostgreSQL / SQLite)
 ```
 
-## How To Run Locally
+- **Frontend**: HTML5, CSS3 (Custom Glassmorphism design system), Vanilla JavaScript (ES6+ async/await API client).
+- **Backend / API**: Node.js, Express.js REST API with V8 Cloudflare Worker fetch adapter (`worker.js`).
+- **Database**: PostgreSQL (Cloud / Production) with lazy connection pooling, fallback to SQLite (`taskmanager.db`) for local Node.js runs.
+- **Deployment & Hosting**: Cloudflare Workers (`task-manager`), GitHub Pages (Redirect entry point).
 
-Open `index.html` directly in your browser.
+---
 
-No installation is needed.
+## API Documentation
 
-## GitHub Pages Deployment
+The backend exposes the following RESTful endpoints:
 
-1. Create a new GitHub repository.
-2. Upload these files:
-   - `index.html`
-   - `style.css`
-   - `script.js`
-   - `README.md`
-3. Go to the repository `Settings`.
-4. Open the `Pages` section.
-5. Under `Build and deployment`, choose:
-   - Source: `Deploy from a branch`
-   - Branch: `main`
-   - Folder: `/root`
-6. Save the settings.
-7. Wait a few moments for GitHub to publish the site.
+### Health Check
+- `GET /api/health` - System status and timestamp.
 
-Your project will be available at:
+### Authentication Endpoints
+- `POST /api/auth/register` - Creates a new user account (`{ name, email, password }`).
+- `POST /api/auth/login` - Authenticates user credentials (`{ email, password }`).
+- `GET /api/auth/me` - Retrieves current authenticated user profile (`Header: Authorization: Bearer <token>`).
+
+### Task Management Endpoints (Requires `Authorization: Bearer <token>`)
+- `GET /api/tasks` - Fetches all tasks for the logged-in user.
+- `POST /api/tasks` - Creates a new task (`{ title, priority, dueDate, completed }`).
+- `PUT /api/tasks/:id` - Updates task details (`{ title, priority, dueDate }`).
+- `PATCH /api/tasks/:id/toggle` - Toggles task completion status (`{ completed }`).
+- `DELETE /api/tasks/:id` - Deletes a task by ID.
+
+---
+
+## Project Structure
 
 ```text
-https://your-username.github.io/your-repository-name/
+.
+├── public/
+│   ├── index.html        # TaskFlow application user interface
+│   ├── script.js         # Frontend JavaScript & REST API client handlers
+│   └── style.css         # Glassmorphic responsive styling & theme variables
+├── server.js             # Express.js application & REST API routes
+├── db.js                 # PostgreSQL / SQLite connection pool & table migration
+├── worker.js             # Cloudflare Worker fetch adapter
+├── wrangler.json         # Cloudflare Worker configuration manifest
+├── package.json          # Node.js dependencies & scripts
+├── index.html            # GitHub Pages redirect entry point
+├── .env.example          # Environment variable template
+├── .gitignore            # Git exclusion rules
+└── README.md             # Project documentation
 ```
 
-## Project Description
+---
 
-TaskFlow is a simple frontend-only task manager designed for beginners and project showcases. It demonstrates practical DOM manipulation, event handling, form validation, responsive design, localStorage persistence, filtering, searching, and theme management using only core web technologies.
+## Local Setup & Development
 
-## Interview Explanation
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/gssriram9050/task-manager.git
+   cd task-manager
+   ```
 
-This project can be explained as a static task management dashboard where all user interactions happen in the browser. Tasks and preferences are stored using localStorage, so the data remains available after refreshing the page without needing a backend.
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
-Key concepts demonstrated:
+3. **Run locally:**
+   ```bash
+   npm start
+   ```
+   The backend will automatically initialize the local `taskmanager.db` SQLite database, seed demo data, and listen at `http://localhost:5000`.
 
-- DOM selection and manipulation
-- JavaScript event listeners
-- Form validation
-- CRUD operations on task data
-- Array methods such as `map`, `filter`, and `find`
-- localStorage data persistence
-- Responsive CSS grid and flexbox layouts
-- Theme switching with CSS variables
-- Simple UI state management
+4. **Production Deployment (Cloudflare Workers):**
+   ```bash
+   npx wrangler deploy
+   ```
 
-## Notes
+---
 
-- The login and signup system is frontend-only and meant for demonstration purposes.
-- No real authentication or backend account storage is used.
-- Data is stored only in the user's browser through localStorage.
-- Clearing browser storage will remove saved tasks and preferences.
+## Live Links & Repositories
 
-## License
+- **Live Application (Cloudflare Worker):** [https://task-manager.gssriram.workers.dev/](https://task-manager.gssriram.workers.dev/)
+- **GitHub Pages:** [https://gssriram9050.github.io/task-manager/](https://gssriram9050.github.io/task-manager/)
+- **GitHub Repository:** [https://github.com/gssriram9050/task-manager](https://github.com/gssriram9050/task-manager)
 
-This project is open source and free to use for learning, portfolio, and showcase purposes.
+---
+
+## Internship Attribution
+This project was developed as part of the **Full Stack Development Internship** at **Thiranex Education LLP**.
