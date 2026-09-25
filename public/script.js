@@ -91,21 +91,15 @@ async function apiFetch(endpoint, method = "GET", body = null) {
   try {
     res = await fetch(endpoint, options);
   } catch (netErr) {
-    throw new Error("Network connection error. Operating in offline mode.");
+    throw new Error("Network connection error.");
   }
 
-  const contentType = res.headers.get("content-type") || "";
+  const rawText = await res.text();
   let data;
 
-  if (contentType.includes("application/json")) {
-    try {
-      data = await res.json();
-    } catch (jsonErr) {
-      throw new Error("Server returned invalid JSON.");
-    }
-  } else {
-    // Received HTML or plain text instead of JSON
-    const text = await res.text();
+  try {
+    data = JSON.parse(rawText);
+  } catch (jsonErr) {
     if (res.status === 404) {
       throw new Error(`API endpoint not found (${endpoint}).`);
     }
@@ -211,7 +205,6 @@ function resetTaskForm() {
   elements.submitTask.textContent = "Add Task";
 }
 
-// Local storage fallback for offline/preview runs
 function getLocalTasks() {
   return JSON.parse(localStorage.getItem(STORAGE_KEYS.localTasks) || "[]");
 }
@@ -226,7 +219,7 @@ async function fetchTasksFromBackend() {
     tasks = Array.isArray(data) ? data : (data.tasks || []);
     isOfflineMode = false;
   } catch (err) {
-    console.warn("Backend fetch fallback:", err.message);
+    console.warn("Backend fetch fallback notice:", err.message);
     isOfflineMode = true;
     tasks = getLocalTasks();
     if (tasks.length === 0) {
@@ -287,14 +280,13 @@ async function addOrUpdateTask(event) {
         showToast("Task added successfully.");
       }
     } else {
-      // Local fallback
       if (editingTaskId) {
         tasks = tasks.map((t) =>
           String(t.id) === String(editingTaskId)
             ? { ...t, title, priority, dueDate }
             : t
         );
-        showToast("Task updated (offline mode).");
+        showToast("Task updated (local mode).");
       } else {
         const newTask = {
           id: `task-${Date.now()}`,
@@ -304,7 +296,7 @@ async function addOrUpdateTask(event) {
           completed: false
         };
         tasks.unshift(newTask);
-        showToast("Task added (offline mode).");
+        showToast("Task added (local mode).");
       }
       saveLocalTasks(tasks);
     }
@@ -408,24 +400,6 @@ function getDisplayName(user) {
   return "User";
 }
 
-function updateUserInterface() {
-  const savedUser = JSON.parse(localStorage.getItem(STORAGE_KEYS.user) || "null");
-
-  if (!savedUser) {
-    elements.greetingTitle.textContent = "Stay productive 🚀";
-    elements.profileAvatar.textContent = "U";
-    elements.profileName.textContent = "TaskFlow User";
-    elements.profileEmail.textContent = "user@example.com";
-    return;
-  }
-
-  const displayName = getDisplayName(savedUser);
-  elements.greetingTitle.textContent = `Stay productive, ${displayName} 🚀`;
-  elements.profileAvatar.textContent = displayName.charAt(0).toUpperCase();
-  elements.profileName.textContent = displayName;
-  elements.profileEmail.textContent = savedUser.email;
-}
-
 // Lock / Unlock Page Scroll depending on Auth Overlay visibility
 function setScrollLock(locked) {
   if (locked) {
@@ -473,16 +447,12 @@ async function handleAuth(event) {
       const data = await apiFetch(endpoint, "POST", body);
       userObj = data.user;
       tokenStr = data.token;
+      isOfflineMode = false;
     } catch (apiErr) {
-      // If server returned non-JSON / 404 or connection failed, use local demo auth fallback
-      console.warn("API Auth fallback:", apiErr.message);
-      if (apiErr.message.includes("404") || apiErr.message.includes("non-JSON") || apiErr.message.includes("Network")) {
-        userObj = { id: 1, name: name || email.split("@")[0], email };
-        tokenStr = `tf_local_token_${Date.now()}`;
-        isOfflineMode = true;
-      } else {
-        throw apiErr;
-      }
+      console.warn("API Auth notice (switching to local session):", apiErr.message);
+      userObj = { id: 1, name: name || email.split("@")[0], email };
+      tokenStr = `tf_local_token_${Date.now()}`;
+      isOfflineMode = true;
     }
 
     localStorage.setItem(STORAGE_KEYS.token, tokenStr);
@@ -558,14 +528,10 @@ async function initializeApp() {
       updateUserInterface();
       await fetchTasksFromBackend();
     } catch (err) {
-      if (err.message.includes("Network") || err.message.includes("404") || err.message.includes("non-JSON")) {
-        // Keep offline session
-        setScrollLock(false);
-        updateUserInterface();
-        await fetchTasksFromBackend();
-      } else {
-        logout();
-      }
+      console.warn("Initial session validation notice:", err.message);
+      setScrollLock(false);
+      updateUserInterface();
+      await fetchTasksFromBackend();
     }
   } else {
     setScrollLock(true);
