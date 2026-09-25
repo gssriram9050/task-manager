@@ -5,10 +5,19 @@ import db from './db.js';
 const app = express();
 
 app.use(cors());
-app.use(express.json());
 
-// Serve static frontend files when running standalone
-app.use(express.static('public'));
+// Body parser middleware supporting pre-parsed req.body from worker.js adapter
+app.use((req, res, next) => {
+  if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+    return next();
+  }
+  express.json()(req, res, (err) => {
+    if (err) req.body = {};
+    next();
+  });
+});
+
+app.use(express.urlencoded({ extended: true }));
 
 // Token generator and helper
 function generateToken(user) {
@@ -38,25 +47,29 @@ function parseToken(token) {
 
 // Authentication Middleware
 async function authMiddleware(req, res, next) {
-  const authHeader = req.headers['authorization'] || req.headers['Authorization'];
-  if (!authHeader) {
-    return res.status(401).json({ error: 'Authorization header missing' });
-  }
+  try {
+    const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+    if (!authHeader) {
+      return res.status(401).json({ error: 'Authorization header missing' });
+    }
 
-  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-  const tokenData = parseToken(token);
-  if (!tokenData) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
-  }
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    const tokenData = parseToken(token);
+    if (!tokenData) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
 
-  const env = req.env || null;
-  const user = await db.findUserById(tokenData.id, env);
-  if (!user) {
-    return res.status(401).json({ error: 'User account not found' });
-  }
+    const env = req.env || null;
+    const user = await db.findUserById(tokenData.id, env);
+    if (!user) {
+      return res.status(401).json({ error: 'User account not found' });
+    }
 
-  req.user = user;
-  next();
+    req.user = user;
+    next();
+  } catch (err) {
+    res.status(401).json({ error: 'Authentication failed: ' + err.message });
+  }
 }
 
 // System Health Endpoint
@@ -246,7 +259,7 @@ app.delete('/api/tasks/:id', authMiddleware, async (req, res) => {
 });
 
 // Catch-all 404 handler for API routes to guarantee JSON output
-app.use('/api/*', (req, res) => {
+app.use('/api', (req, res) => {
   res.status(404).json({ error: `API route not found: ${req.method} ${req.originalUrl}` });
 });
 
