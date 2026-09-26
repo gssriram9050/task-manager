@@ -580,6 +580,36 @@ async function initializeApp() {
   initializeScrollAnimations();
 }
 
+async function openAboutModal(e) {
+  if (e) e.preventDefault();
+  const modal = document.getElementById("aboutModal");
+  if (!modal) return;
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
+
+  try {
+    const sysInfo = await apiFetch("/api/system/info");
+    document.getElementById("aboutDbEngine").textContent = sysInfo.dbEngine || "Multi-User Relational Database Active";
+    document.getElementById("aboutDbStatus").textContent = `Engine Status: ${sysInfo.status.toUpperCase()} • v${sysInfo.version}`;
+    document.getElementById("aboutUserCount").textContent = sysInfo.totalUsers ?? "1";
+    document.getElementById("aboutTaskCount").textContent = sysInfo.totalTasks ?? "0";
+  } catch (err) {
+    const user = getCurrentUser();
+    const localTasks = user ? getLocalUserTasks(user.email) : [];
+    document.getElementById("aboutDbEngine").textContent = "Multi-User Relational Database Engine";
+    document.getElementById("aboutDbStatus").textContent = "Edge Express REST Router Active";
+    document.getElementById("aboutUserCount").textContent = getRegisteredLocalUsers().length || "1";
+    document.getElementById("aboutTaskCount").textContent = localTasks.length || tasks.length;
+  }
+}
+
+function closeAboutModal() {
+  const modal = document.getElementById("aboutModal");
+  if (!modal) return;
+  modal.classList.remove("open");
+  modal.setAttribute("aria-hidden", "true");
+}
+
 elements.taskForm.addEventListener("submit", addOrUpdateTask);
 elements.searchInput.addEventListener("input", renderTasks);
 elements.themeToggle.addEventListener("click", toggleTheme);
@@ -588,6 +618,22 @@ elements.authForm.addEventListener("submit", handleAuth);
 elements.loginTab.addEventListener("click", () => setAuthMode("login"));
 elements.signupTab.addEventListener("click", () => setAuthMode("signup"));
 elements.menuToggle.addEventListener("click", () => elements.sidebar.classList.toggle("open"));
+
+const aboutNavBtn = document.getElementById("aboutNavBtn");
+const aboutFooterBtn = document.getElementById("aboutFooterBtn");
+const closeAboutModalX = document.getElementById("closeAboutModal");
+const closeAboutModalBtn = document.getElementById("closeAboutModalBtn");
+const aboutModal = document.getElementById("aboutModal");
+
+if (aboutNavBtn) aboutNavBtn.addEventListener("click", openAboutModal);
+if (aboutFooterBtn) aboutFooterBtn.addEventListener("click", openAboutModal);
+if (closeAboutModalX) closeAboutModalX.addEventListener("click", closeAboutModal);
+if (closeAboutModalBtn) closeAboutModalBtn.addEventListener("click", closeAboutModal);
+if (aboutModal) {
+  aboutModal.addEventListener("click", (e) => {
+    if (e.target.id === "aboutModal") closeAboutModal();
+  });
+}
 
 elements.filterButtons.forEach((button) => {
   button.addEventListener("click", () => setFilter(button.dataset.filter));

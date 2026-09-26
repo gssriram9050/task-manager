@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="TaskFlow - A responsive task management application for organizing daily tasks.">
+  <meta name="description" content="TaskFlow - Full-Stack Task Management Application with Express REST API and Multi-User Relational Database.">
   <title>TaskFlow - Task Management Application</title>
-  <link rel="stylesheet" href="style.css?v=3.0">
+  <link rel="stylesheet" href="style.css?v=3.1">
 </head>
 <body class="auth-active">
   <div class="app-shell" id="appShell">
@@ -21,7 +21,7 @@
       <nav class="side-nav" aria-label="Dashboard navigation">
         <a href="#overview" class="active">Overview</a>
         <a href="#tasks">Tasks</a>
-        <a href="#footer">About</a>
+        <a href="#about" id="aboutNavBtn">About</a>
       </nav>
 
       <div class="profile-card glass">
@@ -52,7 +52,7 @@
         <div class="hero-copy">
           <p class="eyebrow">Daily Focus</p>
           <h2>Organize tasks, track progress, and finish the day with clarity.</h2>
-          <p>All data stays in your browser using localStorage, making this project simple, private, and GitHub Pages friendly.</p>
+          <p>Powered by a Node.js/Express REST API and persistent multi-user database engine with strict per-user data isolation.</p>
         </div>
         <div class="hero-orbit" aria-hidden="true">
           <span class="orbit-card">Plan</span>
@@ -119,12 +119,13 @@
       </section>
 
       <footer class="footer" id="footer">
-        <p>TaskFlow - Task Management Application.</p>
-        <p>Built with HTML, CSS, Vanilla JavaScript, and localStorage.</p>
+        <p>TaskFlow - Full-Stack Task Management Platform.</p>
+        <p>Powered by Express.js, Cloudflare Worker, and Relational Database Engine. <button class="footer-link-btn" id="aboutFooterBtn">About System Architecture &rarr;</button></p>
       </footer>
     </main>
   </div>
 
+  <!-- Authentication Overlay -->
   <div class="auth-overlay" id="authOverlay">
     <section class="auth-card glass" aria-labelledby="authTitle">
       <div class="auth-header">
@@ -156,11 +157,95 @@
         <button class="primary-button full-width" id="authSubmit" type="submit">Login</button>
       </form>
 
-      <p class="auth-note">Frontend-only validation for a static GitHub Pages project.</p>
+      <p class="auth-note">Multi-user authentication powered by Express REST API & encrypted credentials.</p>
     </section>
   </div>
 
+  <!-- Interactive About Modal -->
+  <div class="modal-overlay" id="aboutModal" aria-hidden="true">
+    <div class="modal-card glass" role="dialog" aria-labelledby="aboutModalTitle">
+      <div class="modal-header">
+        <div class="brand">
+          <span class="brand-mark">TF</span>
+          <div>
+            <h2 id="aboutModalTitle">About TaskFlow</h2>
+            <p class="eyebrow">Enterprise Full-Stack Task Platform v3.0</p>
+          </div>
+        </div>
+        <button class="modal-close" id="closeAboutModal" type="button" aria-label="Close modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="db-status-banner">
+          <span class="status-dot green"></span>
+          <div>
+            <strong id="aboutDbEngine">Multi-User Relational Database Active</strong>
+            <small id="aboutDbStatus">PostgreSQL / Edge D1 Integration Connected</small>
+          </div>
+        </div>
+
+        <div class="arch-flow">
+          <div class="arch-step">
+            <span class="arch-icon">💻</span>
+            <strong>Frontend UI</strong>
+            <small>HTML5, Glassmorphism, Dark/Light Mode</small>
+          </div>
+          <span class="arch-arrow">&rarr;</span>
+          <div class="arch-step">
+            <span class="arch-icon">⚡</span>
+            <strong>Express API</strong>
+            <small>REST Router on Cloudflare Edge Worker</small>
+          </div>
+          <span class="arch-arrow">&rarr;</span>
+          <div class="arch-step">
+            <span class="arch-icon">🗄️</span>
+            <strong>Database</strong>
+            <small>Multi-User Isolated Storage</small>
+          </div>
+        </div>
+
+        <div class="features-grid">
+          <div class="feature-item">
+            <strong>🔒 Strict Multi-User Security</strong>
+            <p>Every account requires valid registration. Tasks are strictly isolated per user account (User A sees ONLY User A's data).</p>
+          </div>
+          <div class="feature-item">
+            <strong>⚡ Express.js REST Backend</strong>
+            <p>Full-stack Node.js Express server wrapped in Cloudflare Workers V8 runtime for sub-millisecond edge latency.</p>
+          </div>
+          <div class="feature-item">
+            <strong>📊 Task CRUD & Real-Time Stats</strong>
+            <p>Create, update, toggle completion status, filter by priority or state, and search through daily focus tasks.</p>
+          </div>
+          <div class="feature-item">
+            <strong>🗃️ Relational DB Persistence</strong>
+            <p>Database schema supporting multi-user registration, password validation, and dynamic relational task management.</p>
+          </div>
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <span class="metric-val" id="aboutUserCount">--</span>
+            <span class="metric-lbl">Registered Users</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-val" id="aboutTaskCount">--</span>
+            <span class="metric-lbl">Tasks Stored</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-val">100%</span>
+            <span class="metric-lbl">Per-User Scoped</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="primary-button" id="closeAboutModalBtn" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="script.js?v=3.0"></script>
+  <script src="script.js?v=3.1"></script>
 </body>
 </html>

@@ -81,6 +81,17 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// System Info Endpoint
+app.get(['/api/system/info', '/api/system/info/'], async (req, res) => {
+  try {
+    const env = req.env || null;
+    const info = await db.getSystemInfo(env);
+    res.json(info);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retrieve system info: ' + err.message });
+  }
+});
+
 // User Registration
 app.post(['/api/auth/register', '/api/auth/register/'], async (req, res) => {
   try {
